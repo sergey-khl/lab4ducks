@@ -1,0 +1,6 @@
+<launch>
+	<group ns="$(arg veh)">
+	    <node pkg="led_controller" type="led_controller_node.py" name="led_controller_node" output="screen"/>
+	</group>
+
+</launch>

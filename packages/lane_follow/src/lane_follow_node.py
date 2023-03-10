@@ -4,7 +4,7 @@ import rospy
 
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CameraInfo, CompressedImage
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 from turbojpeg import TurboJPEG
 import cv2
 import numpy as np
@@ -30,11 +30,17 @@ class LaneFollowNode(DTROS):
                                     self.callback,
                                     queue_size=1,
                                     buff_size="20MB")
+        self.sub_stop = rospy.Subscriber("/" + self.veh + "/stopper",
+                                    String,
+                                    self.cb_stop,
+                                    queue_size=1)
         self.vel_pub = rospy.Publisher("/" + self.veh + "/car_cmd_switch_node/cmd",
                                        Twist2DStamped,
                                        queue_size=1)
 
         self.jpeg = TurboJPEG()
+
+        self.delay = 2
 
         self.loginfo("Initialized")
 
@@ -92,6 +98,9 @@ class LaneFollowNode(DTROS):
         if DEBUG:
             rect_img_msg = CompressedImage(format="jpeg", data=self.jpeg.encode(crop))
             self.pub.publish(rect_img_msg)
+
+    def cb_stop(self, msg):
+        print(msg)
 
     def drive(self):
         if self.proportional is None:
