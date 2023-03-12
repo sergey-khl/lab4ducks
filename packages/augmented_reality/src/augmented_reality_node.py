@@ -85,7 +85,6 @@ class AugmentedRealityNode(DTROS):
         
         results = self.detector.detect(self.undistorted, estimate_tag_pose=True, camera_params=(self.cam_matrix[0,0], self.cam_matrix[1,1], self.cam_matrix[0,2], self.cam_matrix[1,2]), tag_size=0.065)
 
-        # for r in results:
         # extract the bounding box (x, y)-coordinates for the AprilTag
         # and convert each of the (x, y)-coordinate pairs to integers
         try:
@@ -93,15 +92,14 @@ class AugmentedRealityNode(DTROS):
 
             t = tr.translation_from_matrix(tr.translation_matrix(np.array(r.pose_t).reshape(3)))
             d = np.linalg.norm(t)
-            
-            if (d < 0.5):
-                print("STOP UR SHENANIGANS SENOR")
+            print(d)
+            if (d < 0.7):
                 self.stopper()
 
             if (r.tag_id == 93 or r.tag_id == 94 or r.tag_id == 200 or r.tag_id == 201):
                 self.log('UOFA')
                 self.change_led_lights("green")
-            elif (r.tag_id == 62 or r.tag_id == 153 or r.tag_id == 133 or r.tag_id == 56):
+            elif (r.tag_id == 62 or r.tag_id == 153 or r.tag_id == 133 or r.tag_id == 58):
                 self.log('INTERSECTION')
                 self.change_led_lights("blue")
             elif (r.tag_id == 162 or r.tag_id == 169):
@@ -115,20 +113,16 @@ class AugmentedRealityNode(DTROS):
 
     def stopper(self):
         stop = String(data="stop")
-        print(stop)
         self.pub_stop.publish(stop)
 
     def run(self):
-        rate = rospy.Rate(3)
+        rate = rospy.Rate(2)
         self.change_led_lights("white")
-
 
         while not rospy.is_shutdown():
             
             if self.undistorted is not None:
-                
                 self.detect_april()
-
                 rate.sleep()
             else:
                 self.change_led_lights("white")

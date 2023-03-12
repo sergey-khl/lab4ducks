@@ -11,6 +11,7 @@ import numpy as np
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
 
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
+STOP_MASK = [(0, 150, 150), (15, 255, 255)]
 DEBUG = False
 ENGLISH = False
 
@@ -30,17 +31,18 @@ class LaneFollowNode(DTROS):
                                     self.callback,
                                     queue_size=1,
                                     buff_size="20MB")
-        self.sub_stop = rospy.Subscriber("/" + self.veh + "/stopper",
-                                    String,
-                                    self.cb_stop,
-                                    queue_size=1)
+        # self.sub_stop = rospy.Subscriber("/" + self.veh + "/stopper",
+        #                             String,
+        #                             self.cb_stop,
+        #                             queue_size=1)
         self.vel_pub = rospy.Publisher("/" + self.veh + "/car_cmd_switch_node/cmd",
                                        Twist2DStamped,
                                        queue_size=1)
 
         self.jpeg = TurboJPEG()
 
-        self.delay = 2
+        self.delay = 0
+        self.stopping = False
 
         self.loginfo("Initialized")
 
@@ -66,44 +68,88 @@ class LaneFollowNode(DTROS):
         crop = img[300:-1, :, :]
         crop_width = crop.shape[1]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
-        crop = cv2.bitwise_and(crop, crop, mask=mask)
-        contours, hierarchy = cv2.findContours(mask,
+        maskY = cv2.inRange(hsv, ROAD_MASK[0], ROAD_MASK[1])
+        cropY = cv2.bitwise_and(crop, crop, mask=maskY)
+        contoursY, hierarchy = cv2.findContours(maskY,
                                                cv2.RETR_EXTERNAL,
                                                cv2.CHAIN_APPROX_NONE)
+        maskR = cv2.inRange(hsv, STOP_MASK[0], STOP_MASK[1])
+        cropR = cv2.bitwise_and(crop, crop, mask=maskR)
+        contoursR, hierarchy = cv2.findContours(maskR,
+                                               cv2.RETR_EXTERNAL,
+                                               cv2.CHAIN_APPROX_NONE)
+
 
         # Search for lane in front
         max_area = 20
         max_idx = -1
-        for i in range(len(contours)):
-            area = cv2.contourArea(contours[i])
+        for i in range(len(contoursY)):
+            area = cv2.contourArea(contoursY[i])
             if area > max_area:
                 max_idx = i
                 max_area = area
 
         if max_idx != -1:
-            M = cv2.moments(contours[max_idx])
+            M = cv2.moments(contoursY[max_idx])
             try:
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
                 self.proportional = cx - int(crop_width / 2) + self.offset
                 if DEBUG:
-                    cv2.drawContours(crop, contours, max_idx, (0, 255, 0), 3)
-                    cv2.circle(crop, (cx, cy), 7, (0, 0, 255), -1)
+                    cv2.drawContours(cropY, contoursY, max_idx, (0, 255, 0), 3)
+                    cv2.circle(cropY, (cx, cy), 7, (0, 0, 255), -1)
             except:
                 pass
         else:
             self.proportional = None
+
+        # Search for lane in front
+        max_area = 20
+        max_idx = -1
+        for i in range(len(contoursR)):
+            area = cv2.contourArea(contoursR[i])
+            if area > max_area:
+                max_idx = i
+                max_area = area
+        
+        if max_idx != -1:
+            M = cv2.moments(contoursR[max_idx])
+            try:
+                cx = int(M['m10'] / M['m00'])
+                cy = int(M['m01'] / M['m00'])
+                if (self.delay <= 0):
+                    self.stopping = True
+                    self.delay = 4
+                #self.proportional = cx - int(crop_width / 2) + self.offset
+                if DEBUG:
+                    cv2.drawContours(cropR, contoursR, max_idx, (0, 255, 0), 3)
+                    cv2.circle(cropR, (cx, cy), 7, (0, 0, 255), -1)
+            except:
+                pass
 
         if DEBUG:
             rect_img_msg = CompressedImage(format="jpeg", data=self.jpeg.encode(crop))
             self.pub.publish(rect_img_msg)
 
     def cb_stop(self, msg):
-        print(msg)
+        if (msg.data == "stop" and self.delay <= 0):
+            self.stopping = True
+            self.delay = 3
+            
+
 
     def drive(self):
-        if self.proportional is None:
+        self.delay -= (rospy.get_time() - self.last_time)
+        if self.stopping:
+            print('should be stopped')
+            rate = rospy.Rate(1)
+            self.twist.v = 0
+            self.twist.omega = 0
+            for i in range(8):
+                self.vel_pub.publish(self.twist)
+            rate.sleep()
+            self.stopping = False
+        elif self.proportional is None:
             self.twist.omega = 0
         else:
             # P Term
