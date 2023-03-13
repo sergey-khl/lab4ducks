@@ -14,7 +14,7 @@ from duckietown_msgs.msg import LEDPattern
 from duckietown_msgs.srv import ChangePattern
 
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
-STOP_MASK = [(0, 60, 120), (15, 255, 255)]
+STOP_MASK = [(0, 120, 120), (15, 255, 255)]
 DEBUG = False
 ENGLISH = False
 
@@ -119,7 +119,7 @@ class LaneFollowNode(DTROS):
                     if (self.proportional > 200):
                         self.change_led_lights("2")
                         print('going right')
-                        self.turn(-8, 1.2, 1)
+                        self.turn(-8, 1.5, 1)
                     else:
                         self.change_led_lights("0")
                         print('going straight')
@@ -153,6 +153,7 @@ class LaneFollowNode(DTROS):
 
                 if (self.delay <= 0 and cy > 140):
                     self.turning = True
+                    self.delay = 2
                     self.change_led_lights(str(self.following))
                     rate = rospy.Rate(1)
                     self.twist.v = 0
@@ -169,12 +170,12 @@ class LaneFollowNode(DTROS):
                         self.turn(3, 0.5, 1.8)
                     elif (self.following == 2):
                         print('going right')
-                        self.turn(-3, 0.5, 1.8)
+                        self.turn(-4, 0.5, 1.8)
                     else:
                         print('default')
                         self.turn(0, 3, 2)
                         self.update = True
-                    
+                    self.change_led_lights("0")
                     self.turning = False
 
                 if DEBUG:
@@ -189,33 +190,34 @@ class LaneFollowNode(DTROS):
     
     def turn(self, omega, hz, delay):
         rate = rospy.Rate(hz)
+        self.delay = delay
         self.twist.v = self.velocity
         self.twist.omega = omega
         for i in range(8):
             self.vel_pub.publish(self.twist)
         rate.sleep()
-        self.delay = delay
+        
 
 
     def cb_dist(self, msg):
-        print(msg)
         self.stopping = False
         if (msg.x == msg.y and msg.y == msg.z and msg.z == 0):
             # do ya own thang
             self.following = -1
-        elif (msg.z < 0.5):
-            self.stopping = True
+        
         else:
-            
-            if (msg.x < -0.15):
+            if (msg.x < -0.1):
                 # go left
                 self.following = 1
-            elif (msg.x > 0.15):
+            elif (msg.x > 0.1):
                 # go right
                 self.following = 2
             else:
                 # go straight
                 self.following = 0
+
+            if (msg.z < 0.5):
+                self.stopping = True
                 
 
 
@@ -229,11 +231,11 @@ class LaneFollowNode(DTROS):
                 self.twist.omega = 0
                 
             elif self.proportional is None:
-
+                print('idk where I am')
                 self.twist.v = self.velocity
                 self.twist.omega = 0
             else:
-
+                print(self.proportional)
                 # P Term
                 P = -self.proportional * self.P
                 
