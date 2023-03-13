@@ -1,8 +1,0 @@
-<launch>
-
-  <group ns="$(arg veh)">
-    <node pkg="augmented_reality" type="augmented_reality_node.py" name="augmented_reality_node" output="screen">
-      <param name="veh" value="$(arg veh)" />
-    </node>
-  </group>
-</launch>

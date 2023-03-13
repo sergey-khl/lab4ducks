@@ -72,7 +72,7 @@ class LEDNode(DTROS):
         
         new_msg = LEDPattern()
         
-        new_msg.color_mask = [1, 1, 0, 0, 0]
+        new_msg.color_mask = [1, 1, 1, 1, 1]
 
         if (msg.pattern_name.data == "1"):
             new_msg.color_list = ["red", "white", "white", "white", "red"]
