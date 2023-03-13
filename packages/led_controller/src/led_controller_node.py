@@ -68,15 +68,40 @@ class LEDNode(DTROS):
         '''
         Changing the led msg to the one we want to use.
         '''
+        self.turn_off()
+        
         new_msg = LEDPattern()
+        
+        new_msg.color_mask = [1, 1, 0, 0, 0]
 
-        new_msg.color_list = [msg.pattern_name.data] * 5
+        if (msg.pattern_name.data == "1"):
+            new_msg.color_list = ["red", "white", "white", "white", "red"]
+        elif (msg.pattern_name.data == "2"):
+            new_msg.color_list = ["white", "white", "red", "red", "white"]
+        else:
+            new_msg.color_list = ["white"] * 5
+        new_msg.frequency = 0.0
+        new_msg.frequency_mask = [0, 0, 0, 0, 0]
+
+        self.setCustomPattern(new_msg)
+
+        return ChangePatternResponse()
+    
+    def turn_off(self):
+        new_msg = LEDPattern()
+        new_msg.color_list = ["white"] * 5
         new_msg.color_mask = [1, 1, 1, 1, 1]
         new_msg.frequency = 0.0
         new_msg.frequency_mask = [0, 0, 0, 0, 0]
         self.setCustomPattern(new_msg)
 
         return ChangePatternResponse()
+
+    def hook(self):
+        print("SHUTTING DOWN")
+        self.turn_off()
+        for i in range(8):
+            self.turn_off()
 
 
 if __name__ == "__main__":
