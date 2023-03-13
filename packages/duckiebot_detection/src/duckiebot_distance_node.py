@@ -11,6 +11,7 @@ from duckietown_msgs.msg import BoolStamped, VehicleCorners
 from duckietown_msgs.srv import ChangePattern
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
+from geometry_msgs.msg import Point
 from std_msgs.msg import String, Float32
 
 
@@ -49,7 +50,7 @@ class DuckiebotDistanceNode(DTROS):
 
 
         # publishers
-        self.pub_distance_to_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/distance".format(self.host), Float32, queue_size=1)
+        self.pub_distance_to_robot_ahead = rospy.Publisher("/{}/duckiebot_distance_node/distance".format(self.host), Point, queue_size=1)
         self.pcm = PinholeCameraModel()
         
         self.log("Initialization completed")
@@ -109,10 +110,9 @@ class DuckiebotDistanceNode(DTROS):
                     R_inv = np.transpose(R)
                     translation_vector = -np.dot(R_inv, translation_vector)
                     distance_to_vehicle = -translation_vector[2]
-                    print(translation_vector)
                     
                     #####publish the distance information to a topic###
-                    self.pub_distance_to_robot_ahead.publish(Float32(distance_to_vehicle))
+                    self.pub_distance_to_robot_ahead.publish(Point(x=translation_vector[0], y=translation_vector[1], z=distance_to_vehicle))
 
 
                 else:
@@ -122,6 +122,8 @@ class DuckiebotDistanceNode(DTROS):
                     )
             else:
                 self.log("Pose estimation failed. " "Reporting detection at 0cm for safety.")
+        else:
+            self.pub_distance_to_robot_ahead.publish(Point(x=0.0, y=0.0, z=0.0))
 
 
     def calc_circle_pattern(self, height, width):

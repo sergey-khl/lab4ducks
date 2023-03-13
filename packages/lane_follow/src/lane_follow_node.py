@@ -9,6 +9,7 @@ from turbojpeg import TurboJPEG
 import cv2
 import numpy as np
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
+from geometry_msgs.msg import Point
 
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 150, 150), (15, 255, 255)]
@@ -35,7 +36,7 @@ class LaneFollowNode(DTROS):
         #                             String,
         #                             self.cb_stop,
         #                             queue_size=1)
-        self.sub_dist = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance", Float32, self.cb_dist, queue_size=1)
+        self.sub_dist = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance", Point, self.cb_dist, queue_size=1)
         self.vel_pub = rospy.Publisher("/" + self.veh + "/car_cmd_switch_node/cmd",
                                        Twist2DStamped,
                                        queue_size=1)
@@ -44,6 +45,9 @@ class LaneFollowNode(DTROS):
 
         self.delay = 0
         self.stopping = False
+        self.turning = False
+
+        self.following = -1
 
         self.loginfo("Initialized")
 
@@ -65,6 +69,8 @@ class LaneFollowNode(DTROS):
         rospy.on_shutdown(self.hook)
 
     def callback(self, msg):
+        # if (self.following):
+        #     return
         img = self.jpeg.decode(msg.data)
         crop = img[300:-1, :, :]
         crop_width = crop.shape[1]
@@ -118,10 +124,45 @@ class LaneFollowNode(DTROS):
             try:
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
-                if (self.delay <= 0):
-                    self.stopping = True
-                    self.delay = 4
-                #self.proportional = cx - int(crop_width / 2) + self.offset
+                # stop at red line then turn
+                if (self.delay <= 0 and cy > 140):
+                    self.turning = True
+                    rate = rospy.Rate(1)
+                    self.twist.v = 0
+                    self.twist.omega = 0
+                    for i in range(8):
+                        self.vel_pub.publish(self.twist)
+                    rate.sleep()
+                    
+                    if (self.following == 0):
+                        print('going straight')
+                        rate = rospy.Rate(0.3)
+                        self.twist.v = self.velocity
+                        self.twist.omega = 0
+                        for i in range(8):
+                            self.vel_pub.publish(self.twist)
+                        rate.sleep()
+                    elif (self.following == 1):
+                        print('going left')
+                        rate = rospy.Rate(0.5)
+                        self.twist.v = self.velocity
+                        self.twist.omega = 3
+                        for i in range(8):
+                            self.vel_pub.publish(self.twist)
+                        rate.sleep()
+                    elif (self.following == 2):
+                        print('going right')
+                        rate = rospy.Rate(0.5)
+                        self.twist.v = self.velocity
+                        self.twist.omega = -4
+                        for i in range(8):
+                            self.vel_pub.publish(self.twist)
+                        rate.sleep()
+                    else:
+                        print('default')
+                    self.delay = 1.8
+                    self.turning = False
+
                 if DEBUG:
                     cv2.drawContours(cropR, contoursR, max_idx, (0, 255, 0), 3)
                     cv2.circle(cropR, (cx, cy), 7, (0, 0, 255), -1)
@@ -133,39 +174,52 @@ class LaneFollowNode(DTROS):
             self.pub.publish(rect_img_msg)
 
     def cb_dist(self, msg):
-        if (msg.data < 0.3):
+        self.stopping = False
+        if (msg.x == msg.y and msg.y == msg.z and msg.z == 0):
+            # do ya own thang
+            self.following = -1
+        elif (msg.z < 0.3):
             self.stopping = True
-            
+        else:
+            if (msg.x < -0.05):
+                # go left
+                self.following = 1
+            elif (msg.x > 0.05):
+                # go right
+                self.following = 2
+            else:
+                # go straight
+                self.following = 0
+                
 
 
     def drive(self):
         self.delay -= (rospy.get_time() - self.last_time)
-        if self.stopping:
-            rate = rospy.Rate(1)
-            self.twist.v = 0
-            self.twist.omega = 0
-            for i in range(8):
-                self.vel_pub.publish(self.twist)
-            rate.sleep()
-            self.stopping = False
-        elif self.proportional is None:
-            self.twist.omega = 0
-        else:
-            # P Term
-            P = -self.proportional * self.P
+        if not self.turning:
+            if self.stopping:
+                self.twist.v = 0
+                self.twist.omega = 0
+                
+            elif self.proportional is None:
+                self.twist.v = self.velocity
+                self.twist.omega = 0
+            else:
+                # P Term
+                P = -self.proportional * self.P
+                
+                # D Term
+                d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
+                self.last_error = self.proportional
+                
+                D = d_error * self.D
 
-            # D Term
-            d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
-            self.last_error = self.proportional
-            self.last_time = rospy.get_time()
-            D = d_error * self.D
+                self.twist.v = self.velocity
+                self.twist.omega = P + D
+                if DEBUG:
+                    self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
 
-            self.twist.v = self.velocity
-            self.twist.omega = P + D
-            if DEBUG:
-                self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
-
-        self.vel_pub.publish(self.twist)
+            self.vel_pub.publish(self.twist)
+        self.last_time = rospy.get_time()
 
     def hook(self):
         print("SHUTTING DOWN")
