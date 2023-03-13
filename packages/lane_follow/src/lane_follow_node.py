@@ -35,6 +35,7 @@ class LaneFollowNode(DTROS):
         #                             String,
         #                             self.cb_stop,
         #                             queue_size=1)
+        self.sub_dist = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance", Float32, self.cb_dist, queue_size=1)
         self.vel_pub = rospy.Publisher("/" + self.veh + "/car_cmd_switch_node/cmd",
                                        Twist2DStamped,
                                        queue_size=1)
@@ -131,17 +132,15 @@ class LaneFollowNode(DTROS):
             rect_img_msg = CompressedImage(format="jpeg", data=self.jpeg.encode(crop))
             self.pub.publish(rect_img_msg)
 
-    def cb_stop(self, msg):
-        if (msg.data == "stop" and self.delay <= 0):
+    def cb_dist(self, msg):
+        if (msg.data < 0.3):
             self.stopping = True
-            self.delay = 3
             
 
 
     def drive(self):
         self.delay -= (rospy.get_time() - self.last_time)
         if self.stopping:
-            print('should be stopped')
             rate = rospy.Rate(1)
             self.twist.v = 0
             self.twist.omega = 0
