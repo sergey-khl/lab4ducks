@@ -16,6 +16,9 @@ from duckietown_msgs.srv import ChangePattern
 ROAD_MASK = [(20, 60, 0), (50, 255, 255)]
 STOP_MASK = [(0, 120, 120), (15, 255, 255)]
 
+# If using PID controller for collision avoidance
+PID_COLLISION = False 
+
 # Set debugging mode (change to True to enable)
 DEBUG = False
 
@@ -74,8 +77,8 @@ class LaneFollowNode(DTROS):
         # Initialize collision PID Variables
         self.proportional_collision = None
         self.P_gain_collision = 0.049
-        self.D_gain_collision = 0
-        self.last_error_lane_following = 0
+        self.D_gain_collision = -0.004
+        self.last_error_collision = 0
 
         self.last_time = rospy.get_time()
 
@@ -261,10 +264,12 @@ class LaneFollowNode(DTROS):
                 else:
                     # go straight
                     self.following = 0
+                    self.proportional_collision = msg.z
 
                 # If the z-value is less than 0.5, set stopping to True
                 if (msg.z < 0.5):
                     self.stopping = True
+
                 else:
                     self.stopping = False
                 
@@ -272,6 +277,7 @@ class LaneFollowNode(DTROS):
     def drive(self):
         # decrease delay by elapsed time
         self.delay -= (rospy.get_time() - self.last_time)
+
         if self.stopping:
             print('stopping behind bot')
             # stop robot
@@ -282,21 +288,39 @@ class LaneFollowNode(DTROS):
         # check if the robot is turning or stopping
         elif not self.turning:
             try:
-                # P Term
-                P = -self.proportional_lane_following * self.P_gain_lane_following
+                # Lane Following P Term
+                P_lane_following = -self.proportional_lane_following * self.P_gain_lane_following
                 
-                # D Term
-                d_error = (self.proportional_lane_following - self.last_error_lane_following) / (rospy.get_time() - self.last_time)
-                D = d_error * self.D_gain_lane_following
+                # Lane Following D Term
+                d_error_lane_following = (self.proportional_lane_following - self.last_error_lane_following) / (rospy.get_time() - self.last_time)
+                D_lane_following = d_error_lane_following * self.D_gain_lane_following
 
                 self.last_error_lane_following = self.proportional_lane_following
 
+                if self.proportional_collision is not None:
+                    # Collision P Term
+                    P_collision = -self.proportional_collision * self.P_gain_collision
+                    
+                    # Collision D Term
+                    d_error_collision = (self.proportional_collision - self.last_error_collision) / (rospy.get_time() - self.last_time)
+                    D_collision = d_error_collision * self.D_gain_collision
+
+                    self.last_error_collision = self.proportional_collision
+
+
                 # set linear and angular velocity
-                self.twist.v = self.velocity
-                self.twist.omega = P + D
+                if PID_COLLISION:
+                    self.twist.v = P_collision + D_collision
+
+                else: 
+                    print(f'PID lin vel: {P_collision + D_collision}')
+                    self.twist.v = self.velocity
+
+
+                self.twist.omega = P_lane_following + D_lane_following
 
                 if DEBUG:
-                    self.loginfo(self.proportional_lane_following, P, D, self.twist.omega, self.twist.v)
+                    self.loginfo(self.proportional_lane_following, P_lane_following, D_lane_following, self.twist.omega, self.twist.v)
 
             except:
                 # robot is lost and doesn't know where to go
