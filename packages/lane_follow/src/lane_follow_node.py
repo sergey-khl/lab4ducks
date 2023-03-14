@@ -40,10 +40,6 @@ class LaneFollowNode(DTROS):
                                     queue_size=1,
                                     buff_size="20MB")
         
-        # self.sub_stop = rospy.Subscriber("/" + self.veh + "/stopper",
-        #                             String,
-        #                             self.cb_stop,
-        #                             queue_size=1)
 
         # Initialize distance subscriber and velocity publisher
         self.sub_dist = rospy.Subscriber("/" + self.veh + "/duckiebot_distance_node/distance", Point, self.cb_dist, queue_size=1)
@@ -141,16 +137,16 @@ class LaneFollowNode(DTROS):
                 self.proportional_lane_following = cx - int(crop_width / 2) + self.offset
 
                 # if the error is within a threshold, move straight, otherwise turn right or left
-                if (self.update):
+                if self.update and not self.stopping and not self.turning:
                     self.turning = True
                     if (self.proportional_lane_following > 200):
                         self.change_led_lights("2")
-                        print('going right')
-                        self.turn(-8, 1.5, 1)
+                        print('default right')
+                        self.turn(-8, 1.7, 1.8)
                     else:
                         self.change_led_lights("0")
-                        print('going straight')
-                        self.turn(0, 0.7, 1)
+                        print('default straight')
+                        self.turn(0, 0.7, 2)
 
                     self.change_led_lights("0")
                     self.update = False
@@ -182,10 +178,10 @@ class LaneFollowNode(DTROS):
                 cy = int(M['m01'] / M['m00'])
                  # If the robot has reached the red line, it stops and turns
                  
-                if (self.delay <= 0 and cy > 140):
+                if self.delay <= 0 and cy > 140 and not self.stopping and not self.turning:
                     self.turning = True
                     self.delay = 2
-
+                    print('stop, red line')
                     # Changes the LED lights according to the direction
                     # it's going to turn (straight, left, right, default)
                     self.change_led_lights(str(self.following))
@@ -209,7 +205,6 @@ class LaneFollowNode(DTROS):
                         print('going right')
                         self.turn(-4, 0.5, 1.8)
                     else:
-                        print('default')
                         self.turn(0, 3, 2)
                         self.update = True
 
@@ -251,51 +246,42 @@ class LaneFollowNode(DTROS):
         
 
     def cb_dist(self, msg):
-        self.stopping = False
-
-        # If the distance values received are all 0, set following to -1
-        if (msg.x == msg.y and msg.y == msg.z and msg.z == 0):
-            # do ya own thang
-            self.following = -1
         
-        else:
-            if (msg.x < -0.1):
-                # go left
-                self.following = 1
-            elif (msg.x > 0.1):
-                # go right
-                self.following = 2
+        # If the distance values received are all 0, set following to -1
+            if msg.x == msg.y and msg.y == msg.z and msg.z == 0 and not self.stopping:
+                # do ya own thang
+                self.following = -1
             else:
-                # go straight
-                self.following = 0
+                if (msg.x < -0.1):
+                    # go left
+                    self.following = 1
+                elif (msg.x > 0.1):
+                    # go right
+                    self.following = 2
+                else:
+                    # go straight
+                    self.following = 0
 
-            # If the z-value is less than 0.5, set stopping to True
-            if (msg.z < 0.5):
-                self.stopping = True
+                # If the z-value is less than 0.5, set stopping to True
+                if (msg.z < 0.5):
+                    self.stopping = True
+                else:
+                    self.stopping = False
                 
 
     def drive(self):
         # decrease delay by elapsed time
         self.delay -= (rospy.get_time() - self.last_time)
+        if self.stopping:
+            print('stopping behind bot')
+            # stop robot
+            self.twist.v = 0
+            self.twist.omega = 0
+            self.vel_pub.publish(self.twist)
 
         # check if the robot is turning or stopping
-        if not self.turning:
-            if self.stopping:
-
-                # stop robot
-                self.twist.v = 0
-                self.twist.omega = 0
-                
-            elif self.proportional_lane_following is None:
-                # robot is lost and doesn't know where to go
-                print('idk where I am')
-                self.twist.v = self.velocity
-                self.twist.omega = 0
-
-            else:
-                # proportional controller
-                print(self.proportional_lane_following)
-
+        elif not self.turning:
+            try:
                 # P Term
                 P = -self.proportional_lane_following * self.P_gain_lane_following
                 
@@ -311,6 +297,13 @@ class LaneFollowNode(DTROS):
 
                 if DEBUG:
                     self.loginfo(self.proportional_lane_following, P, D, self.twist.omega, self.twist.v)
+
+            except:
+                # robot is lost and doesn't know where to go
+                print('idk where I am')
+                self.twist.v = self.velocity
+                self.twist.omega = 0
+
 
             # publish twist message
             self.vel_pub.publish(self.twist)

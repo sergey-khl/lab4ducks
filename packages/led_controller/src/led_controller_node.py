@@ -75,7 +75,7 @@ class LEDNode(DTROS):
         new_msg.color_mask = [1, 1, 1, 1, 1]
 
         if (msg.pattern_name.data == "1"):
-            new_msg.color_list = ["red", "red", "red", "red", "red"]
+            new_msg.color_list = ["red", "swithedoff", "switchedoff", "switchedoff", "red"]
         elif (msg.pattern_name.data == "2"):
             new_msg.color_list = ["switchedoff", "switchedoff", "red", "red", "switchedoff"]
         else:
