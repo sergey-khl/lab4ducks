@@ -69,11 +69,18 @@ class LaneFollowNode(DTROS):
         if ENGLISH:
             self.offset *= -1
 
-        # Initialize PID Variables
-        self.proportional = None
-        self.P_gain = 0.049
-        self.D_gain = -0.004
-        self.last_error = 0
+        # Initialize lane following PID Variables
+        self.proportional_lane_following = None
+        self.P_gain_lane_following = 0.049
+        self.D_gain_lane_following = -0.004
+        self.last_error_lane_following = 0
+
+        # Initialize collision PID Variables
+        self.proportional_collision = None
+        self.P_gain_collision = 0.049
+        self.D_gain_collision = 0
+        self.last_error_lane_following = 0
+
         self.last_time = rospy.get_time()
 
         # Initialize LED pattern change service
@@ -131,12 +138,12 @@ class LaneFollowNode(DTROS):
                 cy = int(M['m01'] / M['m00'])
 
                 # calculate the error between the center of the lane and the center of the image
-                self.proportional = cx - int(crop_width / 2) + self.offset
+                self.proportional_lane_following = cx - int(crop_width / 2) + self.offset
 
                 # if the error is within a threshold, move straight, otherwise turn right or left
                 if (self.update):
                     self.turning = True
-                    if (self.proportional > 200):
+                    if (self.proportional_lane_following > 200):
                         self.change_led_lights("2")
                         print('going right')
                         self.turn(-8, 1.5, 1)
@@ -155,7 +162,7 @@ class LaneFollowNode(DTROS):
             except:
                 pass
         else:
-            self.proportional = None
+            self.proportional_lane_following = None
 
         # Search for stop line using red color
         max_area = 20
@@ -279,7 +286,7 @@ class LaneFollowNode(DTROS):
                 self.twist.v = 0
                 self.twist.omega = 0
                 
-            elif self.proportional is None:
+            elif self.proportional_lane_following is None:
                 # robot is lost and doesn't know where to go
                 print('idk where I am')
                 self.twist.v = self.velocity
@@ -287,23 +294,23 @@ class LaneFollowNode(DTROS):
 
             else:
                 # proportional controller
-                print(self.proportional)
+                print(self.proportional_lane_following)
 
                 # P Term
-                P = -self.proportional * self.P_gain
+                P = -self.proportional_lane_following * self.P_gain_lane_following
                 
                 # D Term
-                d_error = (self.proportional - self.last_error) / (rospy.get_time() - self.last_time)
-                D = d_error * self.D_gain
+                d_error = (self.proportional_lane_following - self.last_error_lane_following) / (rospy.get_time() - self.last_time)
+                D = d_error * self.D_gain_lane_following
 
-                self.last_error = self.proportional
+                self.last_error_lane_following = self.proportional_lane_following
 
                 # set linear and angular velocity
                 self.twist.v = self.velocity
                 self.twist.omega = P + D
 
                 if DEBUG:
-                    self.loginfo(self.proportional, P, D, self.twist.omega, self.twist.v)
+                    self.loginfo(self.proportional_lane_following, P, D, self.twist.omega, self.twist.v)
 
             # publish twist message
             self.vel_pub.publish(self.twist)
