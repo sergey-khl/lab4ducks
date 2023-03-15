@@ -1,47 +1,33 @@
-# Template: template-ros
+# 🤖 CMPUT 412: Exercise 3 - Computer Vision for Robotics 🤖
 
-This template provides a boilerplate repository
-for developing ROS-based software in Duckietown.
+Implementation of detecting and using apriltags for localization. Visualization in rviz and lane following.
 
-**NOTE:** If you want to develop software that does not use
-ROS, check out [this template](https://github.com/duckietown/template-basic).
+## Run on your Duckiebot
+1. Run the LED demo to get the led_pattern service started:
+  * ```shell 
+    dts duckiebot demo --demo_name led_emitter_node --duckiebot_name $BOT --package_name led_emitter --image duckietown/dt-core:daffy-arm64v8
+    ```   
+2. Build it:
+  * ```shell 
+    dts devel build -f -H MY_ROBOT.local
+    ```   
+3. Run it:
+  * ```shell 
+    dts devel run -H MY_ROBOT.local
+    ```   
 
+## References 🫡
+- [LED node](https://github.com/anna-ssi/duckiebot/blob/50d0b24eab13eb32d92fa83273a05564ca4dd8ef/assignment2/src/led_node.py)
+- [img undistortion](https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html)
+- [dt-apriltags](https://github.com/duckietown/lib-dt-apriltags/blob/master/test/test.py)
+- [apriltag labelling](https://pyimagesearch.com/2020/11/02/apriltag-with-python/)
+- [frame transform](https://github.com/ros/geometry2/blob/noetic-devel/tf2_ros/src/tf2_ros/buffer.py)
+- [yaml load](https://docs.duckietown.org/daffy/duckietown-classical-robotics/out/cra_perception.html)
+- [dead reckoning](https://github.com/wagonhelm/cmput412_exercise3)
+- [LED demo](https://github.com/duckietown/dt-core/blob/6d8e99a5849737f86cab72b04fd2b449528226be/packages/led_emitter/src/led_emitter_node.py#L254)
+- [transformations](https://docs.ros.org/en/jade/api/tf/html/python/transformations.html)
+- [broadcast transforms](https://github.com/ros/geometry2/tree/noetic-devel/tf2_ros/src/tf2_ros)
+- [lane following](https://medium.com/@mrhwick/simple-lane-detection-with-opencv-bfeb6ae54ec)
+- [lane following](https://youtu.be/rVBVqVmHtfc)
 
-## How to use it
-
-### 1. Fork this repository
-
-Use the fork button in the top-right corner of the github page to fork this template repository.
-
-
-### 2. Create a new repository
-
-Create a new repository on github.com while
-specifying the newly forked template repository as
-a template for your new repository.
-
-
-### 3. Define dependencies
-
-List the dependencies in the files `dependencies-apt.txt` and
-`dependencies-py3.txt` (apt packages and pip packages respectively).
-
-
-### 4. Place your code
-
-Place your code in the directory `/packages/` of
-your new repository.
-
-
-### 5. Setup launchers
-
-The directory `/launchers` can contain as many launchers (launching scripts)
-as you want. A default launcher called `default.sh` must always be present.
-
-If you create an executable script (i.e., a file with a valid shebang statement)
-a launcher will be created for it. For example, the script file 
-`/launchers/my-launcher.sh` will be available inside the Docker image as the binary
-`dt-launcher-my-launcher`.
-
-When launching a new container, you can simply provide `dt-launcher-my-launcher` as
-command.
+## Made using: [this template](https://github.com/wagonhelm/cmput412_exercise3)
