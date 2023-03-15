@@ -76,7 +76,7 @@ class LaneFollowNode(DTROS):
 
         # Initialize collision PID Variables
         self.proportional_collision = None
-        self.P_gain_collision = 0.049
+        self.P_gain_collision = 0.95
         self.D_gain_collision = -0.004
         self.last_error_collision = 0
 
@@ -249,29 +249,30 @@ class LaneFollowNode(DTROS):
         
 
     def cb_dist(self, msg):
+        print(f'x offest {msg.x}')
         
         # If the distance values received are all 0, set following to -1
-            if msg.x == msg.y and msg.y == msg.z and msg.z == 0 and not self.stopping:
-                # do ya own thang
-                self.following = -1
+        if msg.x == msg.y and msg.y == msg.z and msg.z == 0 and not self.stopping:
+            # do ya own thang
+            self.following = -1
+        else:
+            if (msg.x < -0.2):
+                # go left
+                self.following = 1
+            elif (msg.x > 0.2):
+                # go right
+                self.following = 2
             else:
-                if (msg.x < -0.1):
-                    # go left
-                    self.following = 1
-                elif (msg.x > 0.1):
-                    # go right
-                    self.following = 2
-                else:
-                    # go straight
-                    self.following = 0
-                    self.proportional_collision = msg.z
+                # go straight
+                self.following = 0
+                self.proportional_collision = msg.z
 
-                # If the z-value is less than 0.5, set stopping to True
-                if (msg.z < 0.5):
-                    self.stopping = True
+            # If the z-value is less than 0.5, set stopping to True
+            if (msg.z < 0.5):
+                self.stopping = True
 
-                else:
-                    self.stopping = False
+            else:
+                self.stopping = False
                 
 
     def drive(self):
@@ -299,7 +300,7 @@ class LaneFollowNode(DTROS):
 
                 if self.proportional_collision is not None:
                     # Collision P Term
-                    P_collision = -self.proportional_collision * self.P_gain_collision
+                    P_collision = self.proportional_collision * self.P_gain_collision
                     
                     # Collision D Term
                     d_error_collision = (self.proportional_collision - self.last_error_collision) / (rospy.get_time() - self.last_time)
@@ -324,7 +325,7 @@ class LaneFollowNode(DTROS):
 
             except:
                 # robot is lost and doesn't know where to go
-                print('idk where I am')
+                print('drive: idk where I am')
                 self.twist.v = self.velocity
                 self.twist.omega = 0
 
