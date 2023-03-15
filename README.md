@@ -18,16 +18,7 @@ Implementation of detecting and using apriltags for localization. Visualization 
 
 ## References 🫡
 - [LED node](https://github.com/anna-ssi/duckiebot/blob/50d0b24eab13eb32d92fa83273a05564ca4dd8ef/assignment2/src/led_node.py)
-- [img undistortion](https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html)
-- [dt-apriltags](https://github.com/duckietown/lib-dt-apriltags/blob/master/test/test.py)
-- [apriltag labelling](https://pyimagesearch.com/2020/11/02/apriltag-with-python/)
-- [frame transform](https://github.com/ros/geometry2/blob/noetic-devel/tf2_ros/src/tf2_ros/buffer.py)
-- [yaml load](https://docs.duckietown.org/daffy/duckietown-classical-robotics/out/cra_perception.html)
-- [dead reckoning](https://github.com/wagonhelm/cmput412_exercise3)
 - [LED demo](https://github.com/duckietown/dt-core/blob/6d8e99a5849737f86cab72b04fd2b449528226be/packages/led_emitter/src/led_emitter_node.py#L254)
-- [transformations](https://docs.ros.org/en/jade/api/tf/html/python/transformations.html)
-- [broadcast transforms](https://github.com/ros/geometry2/tree/noetic-devel/tf2_ros/src/tf2_ros)
-- [lane following](https://medium.com/@mrhwick/simple-lane-detection-with-opencv-bfeb6ae54ec)
-- [lane following](https://youtu.be/rVBVqVmHtfc)
+- [lane following](https://eclass.srv.ualberta.ca/course/view.php?id=85053)
 
-## Made using: [this template](https://github.com/wagonhelm/cmput412_exercise3)
+## Made using: [this template](https://github.com/XZPshaw/CMPUT412503_exercise4)
