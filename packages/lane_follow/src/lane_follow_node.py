@@ -59,8 +59,9 @@ class LaneFollowNode(DTROS):
         self.turning = False
         self.update = False
         self.following = -1
+        self.notSeen = 0
 
-        self.velocity = 0.4
+        self.velocity = 0.3
         self.twist = Twist2DStamped(v=self.velocity, omega=0)
 
         self.offset = 220
@@ -140,12 +141,13 @@ class LaneFollowNode(DTROS):
                 self.proportional_lane_following = cx - int(crop_width / 2) + self.offset
 
                 # if the error is within a threshold, move straight, otherwise turn right or left
-                if self.update and not self.stopping and not self.turning:
+                if self.update:
+                    print('updating   ', self.proportional_lane_following)
                     self.turning = True
                     if (self.proportional_lane_following > 200):
                         self.change_led_lights("2")
                         print('default right')
-                        self.turn(-8, 1.7, 1.8)
+                        self.turn(-7, 2, 1.8)
                     else:
                         self.change_led_lights("0")
                         print('default straight')
@@ -181,9 +183,10 @@ class LaneFollowNode(DTROS):
                 cy = int(M['m01'] / M['m00'])
                  # If the robot has reached the red line, it stops and turns
                  
-                if self.delay <= 0 and cy > 140 and not self.stopping and not self.turning:
-                    self.turning = True
+                if self.delay <= 0 and cy > 140:
+                    
                     self.delay = 2
+                    self.turning = True
                     print('stop, red line')
                     # Changes the LED lights according to the direction
                     # it's going to turn (straight, left, right, default)
@@ -197,22 +200,28 @@ class LaneFollowNode(DTROS):
                         self.vel_pub.publish(self.twist)
                     rate.sleep()
                     
+                    
                     # The robot turns depending on the direction it was following
                     if (self.following == 0):
                         print('going straight')
                         self.turn(0, 0.3, 2)
+                        # Changes LED lights to default
+                        self.change_led_lights("0")
                     elif (self.following == 1):
                         print('going left')
                         self.turn(3, 0.5, 1.8)
+                        # Changes LED lights to default
+                        self.change_led_lights("0")
                     elif (self.following == 2):
                         print('going right')
-                        self.turn(-4, 0.5, 1.8)
+                        self.turn(-4, 0.7, 1.8)
+                        # Changes LED lights to default
+                        self.change_led_lights("0")
                     else:
-                        self.turn(0, 3, 2)
+                        self.turn(0, 2, 2)
                         self.update = True
 
-                    # Changes LED lights to default
-                    self.change_led_lights("0")
+                    
                     self.turning = False
 
                 # Draws the contour and the centroid on the image if in DEBUG mode
@@ -249,85 +258,93 @@ class LaneFollowNode(DTROS):
         
 
     def cb_dist(self, msg):
-        print(f'x offest {msg.x}')
+        #print(f'x offest {msg.x}')
         
         # If the distance values received are all 0, set following to -1
-        if msg.x == msg.y and msg.y == msg.z and msg.z == 0 and not self.stopping:
-            # do ya own thang
-            self.following = -1
-        else:
-            if (msg.x < -0.2):
-                # go left
-                self.following = 1
-            elif (msg.x > 0.2):
-                # go right
-                self.following = 2
-            else:
-                # go straight
-                self.following = 0
-                self.proportional_collision = msg.z
+        if not self.turning:
+            if msg.x == msg.y and msg.y == msg.z and msg.z == 0:
+                # do ya own thang
+                if (self.notSeen <= 0):
+                    self.following = -1
+                    self.stopping = False
 
-            # If the z-value is less than 0.5, set stopping to True
-            if (msg.z < 0.5):
-                self.stopping = True
-
+                    
             else:
-                self.stopping = False
+                self.notSeen = 0.3
+                if (msg.x < -0.1):
+                    # go left
+                    self.following = 1
+                elif (msg.x > 0.1):
+                    # go right
+                    self.following = 2
+                else:
+                    # go straight
+                    self.following = 0
+                    self.proportional_collision = msg.z
+
+                # If the z-value is less than 0.5, set stopping to True
+                if (msg.z < 0.5):
+                    self.stopping = True
+                else:
+                    self.stopping = False
                 
 
     def drive(self):
         # decrease delay by elapsed time
         self.delay -= (rospy.get_time() - self.last_time)
-
-        if self.stopping:
-            print('stopping behind bot')
-            # stop robot
-            self.twist.v = 0
-            self.twist.omega = 0
-            self.vel_pub.publish(self.twist)
+        self.notSeen -= (rospy.get_time() - self.last_time)
+        
+        
 
         # check if the robot is turning or stopping
-        elif not self.turning:
-            try:
-                # Lane Following P Term
-                P_lane_following = -self.proportional_lane_following * self.P_gain_lane_following
-                
-                # Lane Following D Term
-                d_error_lane_following = (self.proportional_lane_following - self.last_error_lane_following) / (rospy.get_time() - self.last_time)
-                D_lane_following = d_error_lane_following * self.D_gain_lane_following
-
-                self.last_error_lane_following = self.proportional_lane_following
-
-                if self.proportional_collision is not None:
-                    # Collision P Term
-                    P_collision = self.proportional_collision * self.P_gain_collision
+        if not self.turning:
+            if self.stopping:
+                print('stopping behind bot')
+                # stop robot
+                self.twist.v = 0
+                self.twist.omega = 0
+            else:
+                try:
+                    print(self.following)
+                    # Lane Following P Term
+                    P_lane_following = -self.proportional_lane_following * self.P_gain_lane_following
                     
-                    # Collision D Term
-                    d_error_collision = (self.proportional_collision - self.last_error_collision) / (rospy.get_time() - self.last_time)
-                    D_collision = d_error_collision * self.D_gain_collision
+                    # Lane Following D Term
+                    d_error_lane_following = (self.proportional_lane_following - self.last_error_lane_following) / (rospy.get_time() - self.last_time)
+                    D_lane_following = d_error_lane_following * self.D_gain_lane_following
 
-                    self.last_error_collision = self.proportional_collision
+                    self.last_error_lane_following = self.proportional_lane_following
+
+                    # if self.proportional_collision is not None:
+                    #     # Collision P Term
+                    #     P_collision = self.proportional_collision * self.P_gain_collision
+                        
+                    #     # Collision D Term
+                    #     d_error_collision = (self.proportional_collision - self.last_error_collision) / (rospy.get_time() - self.last_time)
+                    #     D_collision = d_error_collision * self.D_gain_collision
+
+                    #     self.last_error_collision = self.proportional_collision
 
 
-                # set linear and angular velocity
-                if PID_COLLISION:
-                    self.twist.v = P_collision + D_collision
+                    # # set linear and angular velocity
+                    # if PID_COLLISION:
+                    #     self.twist.v = P_collision + D_collision
 
-                else: 
-                    print(f'PID lin vel: {P_collision + D_collision}')
+                    # else: 
+                    #     print(f'PID lin vel: {P_collision + D_collision}')
                     self.twist.v = self.velocity
 
 
-                self.twist.omega = P_lane_following + D_lane_following
+                    self.twist.omega = P_lane_following + D_lane_following
 
-                if DEBUG:
-                    self.loginfo(self.proportional_lane_following, P_lane_following, D_lane_following, self.twist.omega, self.twist.v)
+                    if DEBUG:
+                        self.loginfo(self.proportional_lane_following, P_lane_following, D_lane_following, self.twist.omega, self.twist.v)
 
-            except:
-                # robot is lost and doesn't know where to go
-                print('drive: idk where I am')
-                self.twist.v = self.velocity
-                self.twist.omega = 0
+                except:
+                    # robot is lost and doesn't know where to go
+                    print('drive: idk where I am')
+                    self.twist.v = self.velocity
+                    self.twist.omega = 0
 
 
             # publish twist message
